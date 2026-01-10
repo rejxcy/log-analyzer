@@ -1,0 +1,56 @@
+# Log Analyzer Configuration Example
+# Copy this file to config.yaml and modify as needed
+
+# OpenSearch connection settings
+opensearch:
+  url: "{{opensearch_url}}"  # From environment variable
+  username: "{{username}}"        # From environment variable
+  password: "{{password}}"    # From environment variable
+  indices:
+    - "pp-slot-api-log*"
+    - "pp-slot-rpc-log*"
+    - "pp-slot-math-log*"
+    - "pp-slot-replay-log*"
+
+# Query settings
+query:
+  max_results: 10000                    # Maximum results per query
+  timeout: "30s"                        # Query timeout
+
+# Analysis settings
+analysis:
+  time_range: "24h"                     # Analysis time range
+  levels: ["error", "warn"]             # Log levels to analyze (optional)
+  keywords: ["error"]                   # Keywords to search for in message field
+  sample_size: 5                        # Samples per error group
+  
+  # Time density settings
+  density:
+    peak_window_minutes: 5              # Peak window size
+    high_density_threshold: 100         # High density threshold (errors/min)
+    critical_density_threshold: 500     # Critical density threshold
+  
+  # Severity calculation settings
+  severity:
+    count_thresholds:
+      high: 1000
+      medium: 100
+      low: 10
+    density_thresholds:
+      critical: 500                     # errors/min
+      high: 100
+      medium: 20
+    trend:
+      anomaly_threshold: 2.0            # 2x increase = anomaly
+
+# Output settings
+output:
+  report_path: "./reports"
+  data_path: "./data"
+  pending_path: "./pending"
+  retention_days: 30                    # Keep data for 30 days
+
+# Logging settings
+logging:
+  level: "info"                         # debug, info, warn, error
+  file: "./logs/analyzer.log"

@@ -1,0 +1,168 @@
+# 已知問題規則配置
+
+known_issues:
+  - id: "ISSUE-001"
+    name: "索引不匹配錯誤"
+    category: "logic"
+    severity: "high"
+    pattern: "mismatch index|index out of range"
+    services:
+      - "pp-slot-api"
+      - "pp-slot-replay"
+    description: |
+      遊戲邏輯中的索引計算錯誤，通常發生在特定遊戲類型或投注金額的邊界情況下。
+    suggested_actions:
+      - "檢查遊戲配置和索引計算邏輯"
+      - "驗證投注金額範圍"
+      - "查看最近的遊戲規則更新"
+    alert_threshold:
+      total: 100
+
+  - id: "ISSUE-002"
+    name: "JSON 解析錯誤"
+    category: "parsing"
+    severity: "high"
+    pattern: "unexpected end of json input|invalid json|unmarshal error"
+    services:
+      - "pp-slot-api"
+      - "pp-slot-session"
+    description: |
+      客戶端或伺服器發送的 JSON 數據格式不完整或損壞。可能與網路中斷或客戶端版本不相容有關。
+    suggested_actions:
+      - "檢查客戶端版本和通訊協議"
+      - "驗證 JSON 序列化邏輯"
+      - "檢查網路連接穩定性"
+    alert_threshold:
+      total: 50
+
+  - id: "ISSUE-003"
+    name: "遊戲點數不足"
+    category: "business_logic"
+    severity: "medium"
+    pattern: "insufficient points|balance not enough|insufficient funds"
+    services:
+      - "pp-slot-api"
+    description: |
+      玩家遊戲點數不足以進行此操作。這是正常的業務邏輯錯誤，應該向客戶端返回友好提示。
+    suggested_actions:
+      - "檢查客戶端是否正確處理此錯誤"
+      - "驗證點數檢查邏輯是否準確"
+      - "確保提示訊息對用戶清晰"
+    alert_threshold:
+      total: 500  # 高閾值，因為這是正常的業務邏輯
+
+  - id: "ISSUE-004"
+    name: "會話密鑰為空"
+    category: "authentication"
+    severity: "high"
+    pattern: "empty mgckey|invalid mgckey|mgckey not found"
+    services:
+      - "pp-slot-api"
+      - "pp-slot-session"
+    description: |
+      使用者會話的加密密鑰遺失或損壞，可能表示會話過期或客戶端識別碼無效。
+    suggested_actions:
+      - "檢查會話管理和密鑰生成邏輯"
+      - "驗證客戶端識別碼的有效期"
+      - "檢查會話存儲（Redis）的可用性"
+    alert_threshold:
+      total: 50
+
+  - id: "ISSUE-005"
+    name: "Redis 快取取得失敗"
+    category: "infrastructure"
+    severity: "high"
+    pattern: "redis message is nil|redis connection refused|redis timeout"
+    services:
+      - "pp-slot-api"
+      - "pp-slot-index"
+    description: |
+      Redis 快取服務無法響應或數據遺失。可能指示 Redis 伺服器故障或網路問題。
+    suggested_actions:
+      - "檢查 Redis 伺服器狀態和連接"
+      - "驗證 Redis 記憶體使用情況"
+      - "檢查網路連接到 Redis"
+      - "考慮實現快取備份策略"
+    alert_threshold:
+      total: 100
+
+  - id: "ISSUE-006"
+    name: "玩家記錄未找到"
+    category: "data"
+    severity: "medium"
+    pattern: "player not found|account not found|no such account"
+    services:
+      - "pp-slot-api"
+      - "pp-slot-session"
+    description: |
+      嘗試訪問不存在的玩家記錄。可能是玩家已被刪除或客戶端使用了過期的帳戶 ID。
+    suggested_actions:
+      - "驗證帳戶管理邏輯"
+      - "檢查客戶端是否傳送了正確的帳戶 ID"
+      - "檢查數據庫中已刪除帳戶的處理方式"
+    alert_threshold:
+      total: 100
+
+  - id: "ISSUE-007"
+    name: "遊戲配置缺失"
+    category: "configuration"
+    severity: "medium"
+    pattern: "game config does not exist|game not found|invalid game id"
+    services:
+      - "pp-slot-api"
+    description: |
+      請求的遊戲配置不存在。可能是客戶端請求了舊版本或不存在的遊戲 ID。
+    suggested_actions:
+      - "檢查遊戲配置管理系統"
+      - "驗證客戶端是否發送了有效的遊戲 ID"
+      - "檢查最近的遊戲列表更新"
+    alert_threshold:
+      total: 50
+
+  - id: "ISSUE-008"
+    name: "帳戶被鎖定"
+    category: "security"
+    severity: "high"
+    pattern: "account is locked|account suspended|login blocked"
+    services:
+      - "pp-slot-session"
+    description: |
+      玩家帳戶因安全原因（如多次登入失敗）已被鎖定。這是安全功能的正常運作。
+    suggested_actions:
+      - "檢查帳戶鎖定規則和解鎖機制"
+      - "驗證客戶端是否顯示正確的錯誤訊息"
+      - "考慮實現帳戶解鎖自助服務"
+    alert_threshold:
+      total: 20  # 相對較低，因為通常表示系統運作正常
+
+  - id: "ISSUE-009"
+    name: "不支援的遊戲類型組合"
+    category: "business_logic"
+    severity: "low"
+    pattern: "does not support spin type|unsupported game mode|invalid configuration"
+    services:
+      - "pp-slot-api"
+    description: |
+      客戶端嘗試使用不支援的遊戲類型和投注類型的組合。這通常是客戶端版本過舊的表現。
+    suggested_actions:
+      - "提示用戶升級客戶端"
+      - "驗證客戶端版本管理"
+      - "確保伺服器和客戶端的遊戲規則同步"
+    alert_threshold:
+      total: 10
+
+  - id: "ISSUE-010"
+    name: "錢包操作失敗"
+    category: "payment"
+    severity: "high"
+    pattern: "wallet fail|wallet error|transaction failed|insufficient balance"
+    services:
+      - "pp-slot-api"
+    description: |
+      玩家錢包系統操作失敗，可能影響遊戲流程和貨幣交易。
+    suggested_actions:
+      - "檢查錢包服務的可用性"
+      - "驗證帳戶點數查詢和更新邏輯"
+      - "檢查交易記錄的一致性"
+    alert_threshold:
+      total: 50
