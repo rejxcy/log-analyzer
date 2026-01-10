@@ -8,16 +8,16 @@ import (
 
 // KnownIssue represents a known issue pattern
 type KnownIssue struct {
-	ID              string
-	Name            string
-	Category        string
-	Severity        string
-	Pattern         string
-	compiledRegex   *regexp.Regexp
-	Services        []string
-	Description     string
+	ID               string
+	Name             string
+	Category         string
+	Severity         string
+	Pattern          string
+	compiledRegex    *regexp.Regexp
+	Services         []string
+	Description      string
 	SuggestedActions []string
-	AlertThreshold  struct {
+	AlertThreshold   struct {
 		Total   int
 		Density int
 	}

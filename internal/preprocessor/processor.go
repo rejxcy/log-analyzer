@@ -77,8 +77,20 @@ func (p *LogPreprocessor) processRawLog(rawLog models.RawLog) (*models.ParsedLog
 		return nil, fmt.Errorf("failed to parse inner JSON: %w", err)
 	}
 
-	// Extract service name from the raw log fields
-	serviceName := rawLog.Source.Fields.ServiceName
+	// Extract service name from the raw log using ServiceExtractor
+	extractor := NewServiceExtractor()
+	serviceName, err := extractor.ExtractServiceName(rawLog)
+	if err != nil {
+		// Fallback: try to get from Fields.ServiceName
+		serviceName = rawLog.Source.Fields.ServiceName
+		if serviceName == "" {
+			// Last resort: extract from rawLog index name
+			serviceName = extractServiceFromIndex(rawLog.Index)
+			if serviceName == "" {
+				return nil, fmt.Errorf("unable to extract service name from log")
+			}
+		}
+	}
 
 	// Create parsed log
 	parsedLog := &models.ParsedLog{
@@ -192,6 +204,23 @@ func (p *LogPreprocessor) GetProcessingStats(rawLogs []models.RawLog, parsedLogs
 	}
 
 	return stats
+}
+
+// extractServiceFromIndex extracts service name from OpenSearch index name
+// e.g., "pp-slot-api-log*" -> "pp-slot-api"
+func extractServiceFromIndex(indexName string) string {
+	// Remove wildcard
+	indexName = strings.TrimSuffix(indexName, "*")
+
+	// Remove common suffixes
+	suffixes := []string{"-log", "-prod", "-staging"}
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(indexName, suffix) {
+			indexName = strings.TrimSuffix(indexName, suffix)
+		}
+	}
+
+	return indexName
 }
 
 // ProcessingStats contains statistics about the preprocessing operation

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -37,9 +38,58 @@ func (r *MarkdownReporter) Generate(analyses []models.Analysis, stats *interface
 	// Generate report content
 	content := r.generateReportContent(analyses, stats)
 
-	// Generate timestamp for filename
-	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	filename := fmt.Sprintf("error_analysis_%s.md", timestamp)
+	// Generate filename with date, services, and time
+	// Format: 日期_服務_時間.md (e.g., 2026-01-11_pp-slot-api_02-02-06.md)
+	date := time.Now().Format("2006-01-02")
+	timeStr := time.Now().Format("15-04-05")
+
+	// Extract unique service names from stats
+	services := make([]string, 0)
+	for serviceName := range stats.ServiceStats {
+		services = append(services, serviceName)
+	}
+	sort.Strings(services)
+	serviceStr := strings.Join(services, "_")
+	if serviceStr == "" {
+		serviceStr = "all-services"
+	}
+
+	filename := fmt.Sprintf("%s_%s_%s.md", date, serviceStr, timeStr)
+	reportPath := filepath.Join(r.reportPath, filename)
+
+	// Write report to file
+	if err := os.WriteFile(reportPath, []byte(content), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write report file: %w", err)
+	}
+
+	return &models.Report{
+		GeneratedAt:       time.Now(),
+		ExecutionTime:     stats.ProcessingTime,
+		TotalLogs:         stats.TotalLogs,
+		ErrorGroupCount:   stats.TotalErrorGroups,
+		HighPriorityCount: countHighPriority(analyses),
+		NewIssueCount:     countNewIssues(analyses),
+		ReportPath:        reportPath,
+		DataSources:       []string{"opensearch"},
+	}, nil
+}
+
+// GeneratePerService generates a separate report for each service
+func (r *MarkdownReporter) GeneratePerService(analyses []models.Analysis, stats *interfaces.AggregationResult, serviceName string) (*models.Report, error) {
+	// Create report directory if not exists
+	if err := os.MkdirAll(r.reportPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create report directory: %w", err)
+	}
+
+	// Generate report content
+	content := r.generateReportContent(analyses, stats)
+
+	// Generate filename with date, service, and time
+	// Format: 日期_服務_時間.md (e.g., 2026-01-11_pp-slot-api_02-02-06.md)
+	date := time.Now().Format("2006-01-02")
+	timeStr := time.Now().Format("15-04-05")
+
+	filename := fmt.Sprintf("%s_%s_%s.md", date, serviceName, timeStr)
 	reportPath := filepath.Join(r.reportPath, filename)
 
 	// Write report to file
@@ -313,15 +363,16 @@ func extractProblemName(a models.Analysis) string {
 }
 
 func extractCountFromReason(reason string) string {
-	// Extract "N times" from reason like "Error occurred 274 times in service..."
-	if strings.Contains(reason, " times ") {
-		parts := strings.Split(reason, " ")
-		for i, p := range parts {
-			if p == "times" && i > 0 {
-				return parts[i-1]
-			}
-		}
+	// Extract count from reason using regex
+	// Matches patterns like "發生了 45 次" or "occurred 274 times"
+
+	// Try regex pattern: any digits
+	re := regexp.MustCompile(`(\d+)\s*(?:次|times)`)
+	matches := re.FindStringSubmatch(reason)
+	if len(matches) > 1 {
+		return matches[1]
 	}
+
 	return "unknown"
 }
 

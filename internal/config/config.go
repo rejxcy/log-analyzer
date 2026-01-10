@@ -28,8 +28,10 @@ type OpenSearchConfig struct {
 
 // QueryConfig contains query-related settings
 type QueryConfig struct {
-	MaxResults int           `yaml:"max_results"`
-	Timeout    time.Duration `yaml:"timeout"`
+	Keyword   string        `yaml:"keyword"`
+	Indices   []string      `yaml:"indices"`
+	Timeout   time.Duration `yaml:"timeout"`
+	BatchSize int           `yaml:"batch_size"`
 }
 
 // AnalysisConfig contains analysis parameters
@@ -77,10 +79,7 @@ type TrendConfig struct {
 
 // OutputConfig contains output settings
 type OutputConfig struct {
-	ReportPath    string `yaml:"report_path"`
-	DataPath      string `yaml:"data_path"`
-	PendingPath   string `yaml:"pending_path"`
-	RetentionDays int    `yaml:"retention_days"`
+	ReportDir string `yaml:"report_dir"`
 }
 
 // LoggingConfig contains logging settings
@@ -138,11 +137,14 @@ func substituteEnvVars(content string) string {
 
 // applyDefaults applies default values for optional configuration parameters
 func applyDefaults(config *Config) {
-	if config.Query.MaxResults == 0 {
-		config.Query.MaxResults = 10000
-	}
 	if config.Query.Timeout == 0 {
 		config.Query.Timeout = 30 * time.Second
+	}
+	if config.Query.BatchSize == 0 {
+		config.Query.BatchSize = 500
+	}
+	if config.Query.Keyword == "" {
+		config.Query.Keyword = "error"
 	}
 	if config.Analysis.TimeRange == "" {
 		config.Analysis.TimeRange = "24h"
@@ -159,17 +161,8 @@ func applyDefaults(config *Config) {
 	if config.Analysis.Density.CriticalDensityThreshold == 0 {
 		config.Analysis.Density.CriticalDensityThreshold = 500
 	}
-	if config.Output.ReportPath == "" {
-		config.Output.ReportPath = "./reports"
-	}
-	if config.Output.DataPath == "" {
-		config.Output.DataPath = "./data"
-	}
-	if config.Output.PendingPath == "" {
-		config.Output.PendingPath = "./pending"
-	}
-	if config.Output.RetentionDays == 0 {
-		config.Output.RetentionDays = 30
+	if config.Output.ReportDir == "" {
+		config.Output.ReportDir = "./reports"
 	}
 	if len(config.Analysis.Keywords) == 0 {
 		config.Analysis.Keywords = []string{"error"} // Default to searching for errors
@@ -184,11 +177,17 @@ func validate(config *Config) error {
 	if config.OpenSearch.URL == "" {
 		return fmt.Errorf("opensearch.url is required")
 	}
+	if config.OpenSearch.Username == "" {
+		return fmt.Errorf("opensearch.username is required")
+	}
+	if config.OpenSearch.Password == "" {
+		return fmt.Errorf("opensearch.password is required")
+	}
 	if len(config.OpenSearch.Indices) == 0 {
 		return fmt.Errorf("opensearch.indices cannot be empty")
 	}
-	if config.Query.MaxResults <= 0 {
-		return fmt.Errorf("query.max_results must be positive")
+	if config.Query.BatchSize <= 0 {
+		return fmt.Errorf("query.batch_size must be positive")
 	}
 	if config.Analysis.SampleSize <= 0 {
 		return fmt.Errorf("analysis.sample_size must be positive")

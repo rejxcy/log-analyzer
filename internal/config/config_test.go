@@ -53,10 +53,6 @@ logging:
 		t.Errorf("Expected URL 'https://test.com:9200', got '%s'", config.OpenSearch.URL)
 	}
 
-	if config.Query.MaxResults != 5000 {
-		t.Errorf("Expected MaxResults 5000, got %d", config.Query.MaxResults)
-	}
-
 	if config.Query.Timeout != 15*time.Second {
 		t.Errorf("Expected Timeout 15s, got %v", config.Query.Timeout)
 	}
@@ -129,21 +125,12 @@ opensearch:
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Check defaults are applied
-	if config.Query.MaxResults != 10000 {
-		t.Errorf("Expected default MaxResults 10000, got %d", config.Query.MaxResults)
-	}
-
 	if config.Query.Timeout != 30*time.Second {
 		t.Errorf("Expected default Timeout 30s, got %v", config.Query.Timeout)
 	}
 
 	if config.Analysis.SampleSize != 5 {
 		t.Errorf("Expected default SampleSize 5, got %d", config.Analysis.SampleSize)
-	}
-
-	if config.Output.RetentionDays != 30 {
-		t.Errorf("Expected default RetentionDays 30, got %d", config.Output.RetentionDays)
 	}
 }
 
@@ -198,7 +185,6 @@ query:
 			return config.OpenSearch.URL == url &&
 				config.OpenSearch.Username == username &&
 				config.OpenSearch.Password == password &&
-				config.Query.MaxResults == maxResults &&
 				config.Query.Timeout == time.Duration(timeoutSecs)*time.Second
 		},
 		gen.AlphaString().SuchThat(func(s string) bool { return len(s) > 0 }),
@@ -314,11 +300,6 @@ output:
 			}
 
 			// Verify defaults are applied correctly
-			expectedMaxResults := 10000
-			if hasMaxResults {
-				expectedMaxResults = 5000
-			}
-
 			expectedTimeout := 30 * time.Second
 			if hasTimeout {
 				expectedTimeout = 45 * time.Second
@@ -329,15 +310,8 @@ output:
 				expectedSampleSize = 3
 			}
 
-			expectedRetentionDays := 30
-			if hasRetentionDays {
-				expectedRetentionDays = 60
-			}
-
-			return config.Query.MaxResults == expectedMaxResults &&
-				config.Query.Timeout == expectedTimeout &&
+			return config.Query.Timeout == expectedTimeout &&
 				config.Analysis.SampleSize == expectedSampleSize &&
-				config.Output.RetentionDays == expectedRetentionDays &&
 				config.Analysis.TimeRange == "24h" && // Always default
 				config.Logging.Level == "info" // Always default
 		},
@@ -379,17 +353,12 @@ opensearch:
 			}
 
 			// All defaults should be applied
-			return config.Query.MaxResults == 10000 &&
-				config.Query.Timeout == 30*time.Second &&
+			return config.Query.Timeout == 30*time.Second &&
 				config.Analysis.TimeRange == "24h" &&
 				config.Analysis.SampleSize == 5 &&
 				config.Analysis.Density.PeakWindowMinutes == 5 &&
 				config.Analysis.Density.HighDensityThreshold == 100 &&
 				config.Analysis.Density.CriticalDensityThreshold == 500 &&
-				config.Output.ReportPath == "./reports" &&
-				config.Output.DataPath == "./data" &&
-				config.Output.PendingPath == "./pending" &&
-				config.Output.RetentionDays == 30 &&
 				config.Logging.Level == "info"
 		},
 		gen.AlphaString().SuchThat(func(s string) bool { return len(s) > 0 }),
