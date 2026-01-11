@@ -116,7 +116,11 @@ func (r *MarkdownReporter) generateReportContent(analyses []models.Analysis, sta
 	// Header
 	sb.WriteString("# 🔍 每日錯誤分析報告\n\n")
 	sb.WriteString(fmt.Sprintf("**生成時間**: %s  \n", time.Now().Format("2006-01-02 15:04:05")))
-	sb.WriteString(fmt.Sprintf("**分析週期**: 過去 24 小時\n\n"))
+
+	// Calculate and display query duration
+	duration := stats.TimeStats.QueryDuration
+	durationStr := formatDuration(duration)
+	sb.WriteString(fmt.Sprintf("**分析週期**: %s\n\n", durationStr))
 
 	// Count known vs unknown issues
 	knownCount := 0
@@ -164,7 +168,26 @@ func (r *MarkdownReporter) writeDailyVerdictSection(sb *strings.Builder, analyse
 	sb.WriteString(fmt.Sprintf("%s\n\n", verdict))
 	sb.WriteString(fmt.Sprintf("- **總錯誤數**: %d 個錯誤，涉及 %d 個唯一模式\n", totalLogs, stats.TotalErrorGroups))
 	sb.WriteString(fmt.Sprintf("- **高優先級問題**: %d 個\n", highCount))
-	sb.WriteString(fmt.Sprintf("- **峰值時段**: %02d:00（%d 個錯誤）\n", stats.TimeStats.PeakHour, stats.TimeStats.PeakCount))
+
+	// Display peak window with 30-minute granularity
+	var peakTimeStr string
+	if !stats.TimeStats.PeakWindowStart.IsZero() && !stats.TimeStats.PeakWindowEnd.IsZero() {
+		// Use the calculated peak window (30 minutes)
+		peakTimeStr = fmt.Sprintf("%s 至 %s",
+			stats.TimeStats.PeakWindowStart.Format("2006-01-02 15:04"),
+			stats.TimeStats.PeakWindowEnd.Format("15:04"))
+		sb.WriteString(fmt.Sprintf("- **峰值時段**: %s（%d 個錯誤）\n", peakTimeStr, stats.TimeStats.PeakWindowCount))
+	} else {
+		// Fallback: use hourly peak if window not available
+		peakStart := stats.TimeStats.EarliestLogTime
+		hour := time.Date(peakStart.Year(), peakStart.Month(), peakStart.Day(),
+			stats.TimeStats.PeakHour, 0, 0, 0, peakStart.Location())
+		peakEnd := hour.Add(time.Hour)
+		peakTimeStr = fmt.Sprintf("%s 至 %s",
+			hour.Format("2006-01-02 15:00"),
+			peakEnd.Format("15:00"))
+		sb.WriteString(fmt.Sprintf("- **峰值時段**: %s（%d 個錯誤）\n", peakTimeStr, stats.TimeStats.PeakCount))
+	}
 
 	// Show top 2 most urgent problems
 	if len(analyses) > 0 {
@@ -451,6 +474,38 @@ func countHighPriority(analyses []models.Analysis) int {
 		}
 	}
 	return count
+}
+
+// formatDuration formats a time.Duration into a human-readable string
+// Uses rounding to nearest unit for accuracy (e.g., 3.9h → "過去 4 小時")
+func formatDuration(d time.Duration) string {
+	totalHours := d.Hours()
+
+	// Round to nearest hour (instead of floor)
+	hours := int(totalHours + 0.5)
+
+	// If >= 24 hours, show as days
+	if hours >= 24 {
+		days := hours / 24
+		remaining := hours % 24
+		if remaining == 0 {
+			return fmt.Sprintf("過去 %d 天", days)
+		}
+		return fmt.Sprintf("過去 %d 天 %d 小時", days, remaining)
+	}
+
+	// Otherwise show as hours
+	if hours > 0 {
+		return fmt.Sprintf("過去 %d 小時", hours)
+	}
+
+	// If less than 1 hour, show as minutes
+	minutes := int(d.Minutes() + 0.5)
+	if minutes > 0 {
+		return fmt.Sprintf("過去 %d 分鐘", minutes)
+	}
+
+	return "過去 0 分鐘"
 }
 
 // countNewIssues counts the number of new unknown issues

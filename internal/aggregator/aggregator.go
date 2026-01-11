@@ -70,6 +70,9 @@ func (a *LogAggregator) Aggregate(groups []models.ErrorGroup) (*interfaces.Aggre
 	// Calculate hourly distribution peaks
 	a.calculateHourlyStats(result.TimeStats)
 
+	// Calculate time range and peak window from error groups
+	a.calculateTimeRange(groups, result.TimeStats)
+
 	// Calculate average density
 	if len(groups) > 0 {
 		var totalDensity float64
@@ -84,6 +87,85 @@ func (a *LogAggregator) Aggregate(groups []models.ErrorGroup) (*interfaces.Aggre
 	result.ProcessingTime = time.Since(startTime)
 
 	return result, nil
+}
+
+// calculateTimeRange calculates the time range of logs
+func (a *LogAggregator) calculateTimeRange(groups []models.ErrorGroup, timeStats *interfaces.TimeStats) {
+	if len(groups) == 0 {
+		return
+	}
+
+	var earliest, latest time.Time
+
+	for _, group := range groups {
+		for _, sample := range group.Samples {
+			if earliest.IsZero() || sample.Timestamp.Before(earliest) {
+				earliest = sample.Timestamp
+			}
+			if latest.IsZero() || sample.Timestamp.After(latest) {
+				latest = sample.Timestamp
+			}
+		}
+	}
+
+	timeStats.EarliestLogTime = earliest
+	timeStats.LatestLogTime = latest
+	timeStats.QueryDuration = latest.Sub(earliest)
+
+	// Calculate the most dense 30-minute window
+	a.calculatePeakWindowFromGroups(groups, earliest, timeStats)
+}
+
+// calculatePeakWindowFromGroups finds the most dense 30-minute window across all error groups
+func (a *LogAggregator) calculatePeakWindowFromGroups(groups []models.ErrorGroup, baseTime time.Time, timeStats *interfaces.TimeStats) {
+	// Build 30-minute window distribution
+	windowDistribution := make(map[string]int) // "HH:MM" -> count
+
+	for _, group := range groups {
+		for _, sample := range group.Samples {
+			hour := sample.Timestamp.Hour()
+			minute := sample.Timestamp.Minute()
+
+			// Determine which 30-minute window (00 or 30)
+			window := 0
+			if minute >= 30 {
+				window = 30
+			}
+
+			windowKey := fmt.Sprintf("%02d:%02d", hour, window)
+			windowDistribution[windowKey]++
+		}
+	}
+
+	// Find the window with maximum count
+	var peakWindowKey string
+	maxCount := 0
+	for key, count := range windowDistribution {
+		if count > maxCount {
+			maxCount = count
+			peakWindowKey = key
+		}
+	}
+
+	if peakWindowKey == "" {
+		return
+	}
+
+	// Parse the peak window key and calculate actual times
+	var peakHour, peakMinute int
+	fmt.Sscanf(peakWindowKey, "%02d:%02d", &peakHour, &peakMinute)
+
+	// Use base time (EarliestLogTime) to calculate peak window
+	peakStart := time.Date(
+		baseTime.Year(), baseTime.Month(), baseTime.Day(),
+		peakHour, peakMinute, 0, 0,
+		baseTime.Location(),
+	)
+	peakEnd := peakStart.Add(30 * time.Minute)
+
+	timeStats.PeakWindowStart = peakStart
+	timeStats.PeakWindowEnd = peakEnd
+	timeStats.PeakWindowCount = maxCount
 }
 
 // calculateHourlyStats calculates peak hours and average density

@@ -42,6 +42,16 @@ type TimeStats struct {
 	PeakHour           int
 	PeakCount          int
 	AverageDensity     float64
+
+	// Time range information
+	EarliestLogTime time.Time     // 最早日誌時間
+	LatestLogTime   time.Time     // 最晚日誌時間
+	QueryDuration   time.Duration // 查詢時間範圍
+
+	// Window-based peak statistics (30-minute granularity)
+	PeakWindowStart time.Time // 峰值 30 分鐘窗口的起始時間
+	PeakWindowEnd   time.Time // 峰值 30 分鐘窗口的結束時間
+	PeakWindowCount int       // 峰值窗口的錯誤數
 }
 
 // Fetcher interface for retrieving log data from OpenSearch
